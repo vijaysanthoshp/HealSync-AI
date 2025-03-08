@@ -1,0 +1,10 @@
+reportlab
+pdfplumber
+google-generativeai
+fpdf
+pandas
+langchain
+langchain_community
+langchain-google-genai
+flask
+flask-cors

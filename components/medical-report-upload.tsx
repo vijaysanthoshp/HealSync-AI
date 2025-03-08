@@ -6,13 +6,17 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
+import { uploadMedicalReport, generateUnifiedReport } from "@/services/api"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function MedicalReportUpload() {
+  const { toast } = useToast()
   const [isDragging, setIsDragging] = useState(false)
-  const [uploadedFile, setUploadedFile] = useState(null)
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisComplete, setAnalysisComplete] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [analysisData, setAnalysisData] = useState(null)
 
   const handleDragOver = (e) => {
     e.preventDefault()
@@ -40,9 +44,99 @@ export default function MedicalReportUpload() {
     }
   }
 
-  const handleFileUpload = (file) => {
-    setUploadedFile(file)
-    simulateAnalysis()
+  const handleFileUpload = async (file: File) => {
+    try {
+      // Validate file type
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'text/plain']
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Error",
+          description: "Please upload a PDF, JPG, PNG, or text file.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Validate file size (e.g., 10MB limit)
+      const maxSize = 10 * 1024 * 1024 // 10MB in bytes
+      if (file.size > maxSize) {
+        toast({
+          title: "Error",
+          description: "File size should be less than 10MB.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      setUploadedFile(file)
+      setAnalyzing(true)
+      setProgress(0)
+
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setProgress(prev => Math.min(prev + 10, 90))
+      }, 500)
+
+      // Create FormData and append file
+      const formData = new FormData()
+      formData.append('file', file)
+
+      // Upload file
+      const response = await fetch('/api/upload-medical-report', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('Upload failed')
+      }
+
+      const result = await response.json()
+      setAnalysisData(result)
+      
+      clearInterval(progressInterval)
+      setProgress(100)
+      setAnalyzing(false)
+      setAnalysisComplete(true)
+
+      toast({
+        title: "Success",
+        description: "File uploaded and analyzed successfully.",
+      })
+
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to upload and analyze report. Please try again.",
+        variant: "destructive"
+      })
+      resetUpload()
+    }
+  }
+
+  const handleDownload = async () => {
+    try {
+      const blob = await generateUnifiedReport(analysisData)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `medical-report-${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast({
+        title: "Success",
+        description: "Unified report downloaded successfully",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate unified report. Please try again.",
+        variant: "destructive"
+      })
+    }
   }
 
   const simulateAnalysis = () => {
@@ -75,6 +169,15 @@ export default function MedicalReportUpload() {
     { id: 2, name: "MRI Scan Report", date: "2023-11-20", type: "PDF" },
     { id: 3, name: "Annual Physical", date: "2023-10-05", type: "PDF" },
   ]
+
+  // Add a function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+  }
 
   return (
     <div className="space-y-6">
@@ -135,7 +238,7 @@ export default function MedicalReportUpload() {
                   <FileText className="h-8 w-8 text-blue-500" />
                   <div className="flex-1">
                     <div className="font-medium">{uploadedFile.name}</div>
-                    <div className="text-xs text-gray-500">{(uploadedFile.size / 1024).toFixed(2)} KB</div>
+                    <div className="text-xs text-gray-500">{formatFileSize(uploadedFile.size)}</div>
                   </div>
                 </div>
 
@@ -227,9 +330,9 @@ export default function MedicalReportUpload() {
                       <Eye className="mr-2 h-4 w-4" />
                       Send to Doctor
                     </Button>
-                    <Button>
+                    <Button onClick={handleDownload}>
                       <Download className="mr-2 h-4 w-4" />
-                      Download Report
+                      Download Unified Report
                     </Button>
                   </div>
                 )}
@@ -273,5 +376,54 @@ export default function MedicalReportUpload() {
       </Tabs>
     </div>
   )
+}
+
+// app/api/upload-medical-report/route.ts
+import { NextResponse } from 'next/server'
+import { writeFile } from 'fs/promises'
+import path from 'path'
+
+export async function POST(request: Request) {
+  try {
+    const analysisData = await request.json()
+    
+    // Create PDF
+    const doc = new PDFDocument()
+    let buffers = []
+    doc.on('data', buffers.push.bind(buffers))
+    
+    // Add content to PDF
+    doc.fontSize(20).text('Medical Report Analysis', { align: 'center' })
+    doc.moveDown()
+    
+    // Add metrics
+    Object.entries(analysisData.metrics).forEach(([key, value]) => {
+      doc.fontSize(12).text(`${key}: ${value}`)
+    })
+    
+    doc.moveDown()
+    doc.fontSize(14).text('Recommendations:')
+    analysisData.recommendations.forEach((rec, index) => {
+      doc.fontSize(12).text(`${index + 1}. ${rec}`)
+    })
+    
+    doc.end()
+
+    // Convert to blob
+    const pdfBuffer = Buffer.concat(buffers)
+    
+    return new Response(pdfBuffer, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename=medical-report.pdf'
+      }
+    })
+  } catch (error) {
+    console.error('Error generating PDF:', error)
+    return NextResponse.json(
+      { error: 'Failed to generate report' },
+      { status: 500 }
+    )
+  }
 }
 

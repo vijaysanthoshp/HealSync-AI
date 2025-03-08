@@ -58,7 +58,17 @@ export default function AIChatbot() {
       } else if (userMessage.toLowerCase().includes("diabetes")) {
         response =
           "Diabetes is a condition where your body either doesn't produce enough insulin or can't effectively use the insulin it produces. Key symptoms include increased thirst, frequent urination, hunger, fatigue, and blurred vision. Managing diabetes typically involves monitoring blood sugar, medication or insulin therapy, healthy eating, and regular physical activity."
-      } else {
+      } else if (userMessage.toLowerCase().includes("heart rate")) {
+        response =
+          "Your current heart rate is 72 BPM, which is within the normal range. A normal resting heart rate for adults is typically between 60-100 BPM. Factors like age, fitness level, and medications can affect heart rate."
+      } else if (userMessage.toLowerCase().includes("diet")) {
+        response =
+          "For weight loss, a balanced diet that includes plenty of fruits, vegetables, whole grains, lean proteins, and healthy fats is recommended. Portion control and regular physical activity are also important. It's best to consult with a healthcare provider or dietitian for personalized advice."
+      } else if (userMessage.toLowerCase().includes("covid 19")) {
+        response =
+          "Common symptoms of COVID-19 include fever, cough, shortness of breath, fatigue, muscle aches, loss of taste or smell, and sore throat. If you're experiencing symptoms or have been exposed to someone with COVID-19, it's important to get tested and follow public health guidelines."
+        }
+      else {
         response =
           "Thank you for your question. While I can provide general health information, remember that I'm an AI assistant and not a substitute for professional medical advice. For personalized guidance, please consult with a healthcare provider."
       }
@@ -140,9 +150,14 @@ export default function AIChatbot() {
             <CardContent className="h-[500px] flex flex-col">
               <div className="flex-1 overflow-y-auto mb-4 space-y-4">
                 {messages.map((message, index) => (
-                  <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div 
+                    key={index} 
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
                     <div
-                      className={`flex items-start gap-2 max-w-[80%] ${message.role === "user" ? "flex-row-reverse" : ""}`}
+                      className={`flex items-start gap-2 max-w-[80%] ${
+                        message.role === "user" ? "flex-row-reverse" : ""
+                      }`}
                     >
                       <Avatar className={message.role === "user" ? "bg-blue-100" : "bg-green-100"}>
                         <div className={message.role === "user" ? "text-blue-700" : "text-green-700"}>
@@ -350,4 +365,3 @@ export default function AIChatbot() {
     </div>
   )
 }
-

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Search, MapPin, Star, Calendar, Phone, Mail, Clock, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,9 +11,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
+interface Doctor {
+  id: number
+  name: string
+  specialty: string
+  hospital: string
+  location: string
+  distance: string
+  rating: number
+  reviews: number
+  availability: string
+  education: string
+  experience: string
+  languages: string[]
+  insurances: string[]
+  image: string
+}
+
+interface Filters {
+  specialty: string
+  location: string
+  insurance: string
+  availability: string
+}
+
 export default function DoctorRecommendations() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [filters, setFilters] = useState<Filters>({
+    specialty: "any",
+    location: "",
+    insurance: "any",
+    availability: "any"
+  })
+  const [activeTab, setActiveTab] = useState("recommended")
 
   const mockDoctors = [
     {
@@ -82,11 +113,90 @@ export default function DoctorRecommendations() {
     },
   ]
 
-  const filteredDoctors = mockDoctors.filter(
-    (doctor) =>
-      doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  const filteredDoctors = useMemo(() => {
+    let filtered = [...mockDoctors]
+
+    // Apply search filter
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (doctor) =>
+          doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+
+    // Apply specialty filter
+    if (filters.specialty !== "any") {
+      filtered = filtered.filter(
+        (doctor) => doctor.specialty.toLowerCase() === filters.specialty.toLowerCase()
+      )
+    }
+
+    // Apply location filter
+    if (filters.location) {
+      filtered = filtered.filter(
+        (doctor) => doctor.location.toLowerCase().includes(filters.location.toLowerCase())
+      )
+    }
+
+    // Apply insurance filter
+    if (filters.insurance !== "any") {
+      filtered = filtered.filter(
+        (doctor) => doctor.insurances.some(i => i.toLowerCase() === filters.insurance.toLowerCase())
+      )
+    }
+
+    // Apply availability filter
+    if (filters.availability !== "any") {
+      const today = new Date()
+      filtered = filtered.filter((doctor) => {
+        const availDate = doctor.availability.toLowerCase()
+        switch (filters.availability) {
+          case "today":
+            return availDate.includes("today")
+          case "tomorrow":
+            return availDate.includes("tomorrow")
+          case "this-week":
+            return !availDate.includes("next")
+          case "next-week":
+            return availDate.includes("next")
+          default:
+            return true
+        }
+      })
+    }
+
+    return filtered
+  }, [mockDoctors, searchQuery, filters])
+
+  const handleFilterChange = (key: keyof Filters, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }))
+  }
+
+  const resetFilters = () => {
+    setFilters({
+      specialty: "any",
+      location: "",
+      insurance: "any",
+      availability: "any"
+    })
+    setSearchQuery("")
+  }
+
+  const handleBookAppointment = (doctorId: number) => {
+    // Implement booking logic here
+    alert(`Booking appointment with doctor ${doctorId}`)
+  }
+
+  const handleCallDoctor = (doctorId: number) => {
+    // Implement call logic here
+    alert(`Calling doctor ${doctorId}`)
+  }
+
+  const handleMessageDoctor = (doctorId: number) => {
+    // Implement messaging logic here
+    alert(`Messaging doctor ${doctorId}`)
+  }
 
   return (
     <div className="space-y-6">
@@ -127,7 +237,10 @@ export default function DoctorRecommendations() {
                 <Label htmlFor="specialty" className="text-sm">
                   Specialty
                 </Label>
-                <Select defaultValue="any">
+                <Select 
+                  value={filters.specialty} 
+                  onValueChange={(value) => handleFilterChange("specialty", value)}
+                >
                   <SelectTrigger id="specialty" className="mt-1">
                     <SelectValue placeholder="Select specialty" />
                   </SelectTrigger>
@@ -149,7 +262,12 @@ export default function DoctorRecommendations() {
                   Location
                 </Label>
                 <div className="flex mt-1">
-                  <Input id="location" placeholder="City, State or ZIP" />
+                  <Input 
+                    id="location" 
+                    placeholder="City, State or ZIP"
+                    value={filters.location}
+                    onChange={(e) => handleFilterChange("location", e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -157,7 +275,10 @@ export default function DoctorRecommendations() {
                 <Label htmlFor="insurance" className="text-sm">
                   Insurance
                 </Label>
-                <Select defaultValue="any">
+                <Select 
+                  value={filters.insurance}
+                  onValueChange={(value) => handleFilterChange("insurance", value)}
+                >
                   <SelectTrigger id="insurance" className="mt-1">
                     <SelectValue placeholder="Select insurance" />
                   </SelectTrigger>
@@ -176,7 +297,11 @@ export default function DoctorRecommendations() {
 
             <div className="mt-4">
               <Label className="text-sm">Availability</Label>
-              <RadioGroup defaultValue="any" className="flex flex-wrap gap-4 mt-1">
+              <RadioGroup 
+                value={filters.availability}
+                onValueChange={(value) => handleFilterChange("availability", value)}
+                className="flex flex-wrap gap-4 mt-1"
+              >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="any" id="any" />
                   <Label htmlFor="any">Any time</Label>
@@ -201,7 +326,7 @@ export default function DoctorRecommendations() {
             </div>
 
             <div className="flex justify-end mt-4">
-              <Button variant="outline" className="mr-2">
+              <Button variant="outline" className="mr-2" onClick={resetFilters}>
                 Reset
               </Button>
               <Button>Apply Filters</Button>
@@ -286,16 +411,16 @@ export default function DoctorRecommendations() {
                     </div>
                     <CardFooter className="bg-gray-50 px-6 py-3 flex justify-between">
                       <div className="flex gap-3">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleCallDoctor(doctor.id)}>
                           <Phone className="mr-2 h-4 w-4" />
                           Call
                         </Button>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => handleMessageDoctor(doctor.id)}>
                           <Mail className="mr-2 h-4 w-4" />
                           Message
                         </Button>
                       </div>
-                      <Button size="sm">
+                      <Button size="sm" onClick={() => handleBookAppointment(doctor.id)}>
                         <Calendar className="mr-2 h-4 w-4" />
                         Book Appointment
                       </Button>
@@ -401,16 +526,16 @@ export default function DoctorRecommendations() {
                       </div>
                       <CardFooter className="bg-gray-50 px-6 py-3 flex justify-between">
                         <div className="flex gap-3">
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" onClick={() => handleCallDoctor(doctor.id)}>
                             <Phone className="mr-2 h-4 w-4" />
                             Call
                           </Button>
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" onClick={() => handleMessageDoctor(doctor.id)}>
                             <Mail className="mr-2 h-4 w-4" />
                             Message
                           </Button>
                         </div>
-                        <Button size="sm">
+                        <Button size="sm" onClick={() => handleBookAppointment(doctor.id)}>
                           <Calendar className="mr-2 h-4 w-4" />
                           Book Appointment
                         </Button>
